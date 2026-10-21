@@ -26,6 +26,10 @@ jobs:
           yes | $ANDROID_HOME/cmdline-tools/bin/sdkmanager --sdk_root=$ANDROID_HOME --licenses
           yes | $ANDROID_HOME/cmdline-tools/bin/sdkmanager --sdk_root=$ANDROID_HOME "platform-tools" "build-tools;34.0.0" "platforms;android-34"
 
+      - name: Generate Debug Keystore
+        run: |
+          keytool -keyalg RSA -genkeypair -alias androiddebugkey -keypass android -keystore debug.keystore -storepass android -dname "CN=Android Debug,O=Android,C=US" -validity 9999 -deststoretype pkcs12
+
       - name: Godot Import
         run: |
           mkdir -v -p ~/.local/share/godot
@@ -35,6 +39,7 @@ jobs:
       - name: Export APK
         env:
           ANDROID_HOME: /root/android-sdk
+          GODOT_ANDROID_KEYSTORE_DEBUG_PATH: ${{ github.workspace }}/debug.keystore
         run: |
           mkdir -v -p build/android
           godot --headless --export-debug "Android" build/android/AgriWorld.apk
