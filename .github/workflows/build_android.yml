@@ -2,68 +2,55 @@ name: Build Android APK
 
 on:
   push:
-    branches: [ "main" ]
+    branches: [main]
   workflow_dispatch:
 
 env:
-  GODOT_VERSION: 4.3
-  EXPORT_NAME: "AgriWorld 3D"
-  JAVA_HOME: /usr/lib/jvm/java-17-openjdk-amd64
-  ANDROID_HOME: /root/android-sdk
+  GODOT_VERSION: "4.3"
 
 jobs:
-  build-android:
-    runs-on: ubuntu-latest
+  export-android:
+    runs-on: ubuntu-22.04
     container:
       image: barichello/godot-ci:4.3
-
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Setup Android SDK
+      - name: Set up templates, keystore and editor settings
         run: |
-          export PATH=$PATH:$ANDROID_HOME/cmdline-tools/latest/bin
-          export PATH=$PATH:$ANDROID_HOME/platform-tools
-          mkdir -p $ANDROID_HOME
-          wget -q https://dl.google.com/android/repository/commandlinetools-linux-11076708_latest.zip -O cmdline.zip
-          unzip -q cmdline.zip -d $ANDROID_HOME
-          yes | $ANDROID_HOME/cmdline-tools/bin/sdkmanager --sdk_root=$ANDROID_HOME --licenses
-          # Install the exact build tools version required by Godot 4.3
-          yes | $ANDROID_HOME/cmdline-tools/bin/sdkmanager --sdk_root=$ANDROID_HOME "platform-tools" "build-tools;33.0.2" "platforms;android-33"
+          mkdir -p ~/.local/share/godot/export_templates ~/.config/godot build/android
+          mv /root/.local/share/godot/export_templates/${GODOT_VERSION}.stable ~/.local/share/godot/export_templates/${GODOT_VERSION}.stable
+          keytool -keyalg RSA -genkeypair -alias androiddebugkey -keypass android \
+            -keystore $HOME/debug.keystore -storepass android \
+            -dname "CN=Android Debug,O=Android,C=US" -validity 9999 -deststoretype pkcs12
+          JAVA_HOME_DIR=$(dirname $(dirname $(readlink -f $(which keytool))))
+          echo "Java home: $JAVA_HOME_DIR"
+          printf '%s\n' '[gd_resource type="EditorSettings" format=3]' '' '[resource]' \
+            'export/android/android_sdk_path = "/usr/lib/android-sdk"' \
+            "export/android/java_sdk_path = \"$JAVA_HOME_DIR\"" \
+            "export/android/debug_keystore = \"$HOME/debug.keystore\"" \
+            'export/android/debug_keystore_user = "androiddebugkey"' \
+            'export/android/debug_keystore_pass = "android"' \
+            > ~/.config/godot/editor_settings-4.tres
 
-      - name: Generate Debug Keystore
+      - name: Import project
+        run: godot --headless --import || true
+
+      - name: Export game APK
+        if: always()
         run: |
-          keytool -keyalg RSA -genkeypair -alias androiddebugkey -keypass android -keystore debug.keystore -storepass android -dname "CN=Android Debug,O=Android,C=US" -validity 9999 -deststoretype pkcs12
+          for v in main; do
+            sed -i "s|^run/main_scene=.*|run/main_scene=\"res://scenes/$v.tscn\"|" project.godot
+            grep main_scene project.godot
+            godot --headless --verbose --export-debug "Android" build/android/agriworld-$v.apk
+          done
 
-      - name: Godot Import
-        run: |
-          mkdir -v -p ~/.local/share/godot
-          mv /root/.local/share/godot/export_templates/ ~/.local/share/godot/ 2>/dev/null || true
-          godot --headless --import
+      - name: APK size report
+        if: always()
+        run: ls -l build/android/*.apk || true
 
-      - name: Configure Godot Editor Settings
-        run: |
-          GODOT_CFG=~/.config/godot/editor_settings-4.tres
-          mkdir -p ~/.config/godot
-          echo 'export/android/java_sdk_path = "/usr/lib/jvm/java-17-openjdk-amd64"' > $GODOT_CFG
-          echo 'export/android/android_sdk_path = "/root/android-sdk"' >> $GODOT_CFG
-
-      - name: Inject Keystore into Export Preset
-        run: |
-          # This fixes the "Either Debug Keystore... OR none of them" error
-          sed -i 's|keystore/debug=".*"|keystore/debug="'$GITHUB_WORKSPACE'/debug.keystore"|g' export_presets.cfg
-          sed -i 's|keystore/debug_user=".*"|keystore/debug_user="androiddebugkey"|g' export_presets.cfg
-          sed -i 's|keystore/debug_password=".*"|keystore/debug_password="android"|g' export_presets.cfg
-          cat export_presets.cfg
-
-      - name: Export APK
-        run: |
-          mkdir -v -p build/android
-          godot --headless --export-release "Android" build/android/AgriWorld.apk
-
-      - name: Upload Artifact
-        uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v4
+        if: always()
         with:
-          name: agriworld-apk
-          path: build/android/AgriWorld.apk
+          name: agriworld-debug-apks
+          path: build/android/*.apk
