@@ -44,15 +44,22 @@ jobs:
 
       - name: Configure Godot Editor Settings
         run: |
-          # Use sed to update the settings file, as the image does not read it automatically
-          GODOT_CFG=$(ls ~/.config/godot/editor_settings-*.tres)
-          sed -i -e "s:\(^.*java_sdk_path\)\s*=.*$:\1 = \"$JAVA_HOME\":" $GODOT_CFG
-          sed -i -e "s:\(^.*android_sdk_path\)\s*=.*$:\1 = \"$ANDROID_HOME\":" $GODOT_CFG
+          GODOT_CFG=~/.config/godot/editor_settings-4.tres
+          mkdir -p ~/.config/godot
+          echo 'export/android/java_sdk_path = "/usr/lib/jvm/java-17-openjdk-amd64"' > $GODOT_CFG
+          echo 'export/android/android_sdk_path = "/root/android-sdk"' >> $GODOT_CFG
+
+      - name: Inject Keystore into Export Preset
+        run: |
+          # This fixes the "Either Debug Keystore... OR none of them" error
+          sed -i 's|keystore/debug=".*"|keystore/debug="'$GITHUB_WORKSPACE'/debug.keystore"|g' export_presets.cfg
+          sed -i 's|keystore/debug_user=".*"|keystore/debug_user="androiddebugkey"|g' export_presets.cfg
+          sed -i 's|keystore/debug_password=".*"|keystore/debug_password="android"|g' export_presets.cfg
+          cat export_presets.cfg
 
       - name: Export APK
         run: |
           mkdir -v -p build/android
-          # Use --export-release to reduce APK size (not debug)
           godot --headless --export-release "Android" build/android/AgriWorld.apk
 
       - name: Upload Artifact
