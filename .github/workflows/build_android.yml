@@ -5,6 +5,12 @@ on:
     branches: [ "main" ]
   workflow_dispatch:
 
+env:
+  GODOT_VERSION: 4.3
+  EXPORT_NAME: "AgriWorld 3D"
+  JAVA_HOME: /usr/lib/jvm/java-17-openjdk-amd64
+  ANDROID_HOME: /root/android-sdk
+
 jobs:
   build-android:
     runs-on: ubuntu-latest
@@ -17,7 +23,6 @@ jobs:
 
       - name: Setup Android SDK
         run: |
-          export ANDROID_HOME=$HOME/android-sdk
           export PATH=$PATH:$ANDROID_HOME/cmdline-tools/latest/bin
           export PATH=$PATH:$ANDROID_HOME/platform-tools
           mkdir -p $ANDROID_HOME
@@ -36,27 +41,20 @@ jobs:
           mv /root/.local/share/godot/export_templates/ ~/.local/share/godot/ 2>/dev/null || true
           godot --headless --import
 
-      - name: Create and Configure Godot Editor Settings
+      - name: Configure Godot Editor Settings
         run: |
-          # 1. Create the directory and the settings file
+          GODOT_CFG=~/.config/godot/editor_settings-4.tres
           mkdir -p ~/.config/godot
-          cat > ~/.config/godot/editor_settings-4.tres <<EOF
-          [gd_resource type="EditorSettings" format=3]
-
-          [resource]
-          export/android/java_sdk_path = "/usr/lib/jvm/java-17-openjdk-amd64"
-          export/android/android_sdk_path = "/root/android-sdk"
-          EOF
-          
-          # 2. Copy it to the root user's config location as well
-          mkdir -p /root/.config/godot
-          cp ~/.config/godot/editor_settings-4.tres /root/.config/godot/editor_settings-4.tres
+          # Create the file if it doesn't exist
+          touch $GODOT_CFG
+          # Use sed to insert or update the paths
+          sed -i "s|export/android/java_sdk_path=.*|export/android/java_sdk_path=\"${JAVA_HOME}\"|" $GODOT_CFG
+          sed -i "s|export/android/android_sdk_path=.*|export/android/android_sdk_path=\"${ANDROID_HOME}\"|" $GODOT_CFG
+          # If the lines don't exist, append them
+          grep -q "java_sdk_path" $GODOT_CFG || echo "export/android/java_sdk_path = \"${JAVA_HOME}\"" >> $GODOT_CFG
+          grep -q "android_sdk_path" $GODOT_CFG || echo "export/android/android_sdk_path = \"${ANDROID_HOME}\"" >> $GODOT_CFG
 
       - name: Export APK
-        env:
-          ANDROID_HOME: /root/android-sdk
-          JAVA_HOME: /usr/lib/jvm/java-17-openjdk-amd64
-          GODOT_ANDROID_KEYSTORE_DEBUG_PATH: ${{ github.workspace }}/debug.keystore
         run: |
           mkdir -v -p build/android
           godot --headless --export-debug "Android" build/android/AgriWorld.apk
