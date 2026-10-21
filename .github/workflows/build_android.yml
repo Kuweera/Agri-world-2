@@ -24,8 +24,8 @@ jobs:
           wget -q https://dl.google.com/android/repository/commandlinetools-linux-11076708_latest.zip -O cmdline.zip
           unzip -q cmdline.zip -d $ANDROID_HOME
           yes | $ANDROID_HOME/cmdline-tools/bin/sdkmanager --sdk_root=$ANDROID_HOME --licenses
-          # Install the exact build tools and platform version Godot needs
-          yes | $ANDROID_HOME/cmdline-tools/bin/sdkmanager --sdk_root=$ANDROID_HOME "platform-tools" "build-tools;34.0.0" "platforms;android-34"
+          # Install the exact build tools version the export is requesting
+          yes | $ANDROID_HOME/cmdline-tools/bin/sdkmanager --sdk_root=$ANDROID_HOME "platform-tools" "build-tools;33.0.2" "platforms;android-33"
 
       - name: Generate Debug Keystore
         run: |
@@ -39,12 +39,17 @@ jobs:
 
       - name: Configure Godot Editor Settings
         run: |
-          # This explicitly tells Godot where the Java SDK is located
-          echo 'export/android/java_sdk_path = "/usr/lib/jvm/java-17-openjdk-amd64"' >> ~/.config/godot/editor_settings-4.tres
+          # Use sed to inject the correct paths into the editor settings file
+          export JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64
+          export ANDROID_HOME=$HOME/android-sdk
+          GODOT_CFG=~/.config/godot/editor_settings-4.tres
+          sed -i -e "s:\(^.*java_sdk_path\)\s*=.*$:\1 = \"$JAVA_HOME\":" $GODOT_CFG
+          sed -i -e "s:\(^.*android_sdk_path\)\s*=.*$:\1 = \"$ANDROID_HOME\":" $GODOT_CFG
 
       - name: Export APK
         env:
           ANDROID_HOME: /root/android-sdk
+          JAVA_HOME: /usr/lib/jvm/java-17-openjdk-amd64
           GODOT_ANDROID_KEYSTORE_DEBUG_PATH: ${{ github.workspace }}/debug.keystore
         run: |
           mkdir -v -p build/android
