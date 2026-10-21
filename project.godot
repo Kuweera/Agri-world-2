@@ -3,36 +3,14 @@ config_version=5
 [application]
 config/name="AgriWorld 3D"
 run/main_scene="res://scenes/main.tscn"
-config/features=PackedStringArray("4.3", "GL Compatibility")
-config/description="AgriWorld 3D - offline farming simulator prototype"
+config/features=PackedStringArray("4.2", "Mobile")
 
 [display]
-window/size/viewport_width=960
-window/size/viewport_height=540
-window/size/window_width_override=960
-window/size/window_height_override=540
+window/size/viewport_width=1280
+window/size/viewport_height=720
 window/stretch/mode="canvas_items"
+window/handheld/orientation=1
 
 [rendering]
-renderer/rendering_method="gl_compatibility"
-renderer/rendering_method.mobile="gl_compatibility"
-textures/default_filters/use_nearest_mipmap_filter=false
-environment/defaults/default_clear_color=Color(0.56, 0.76, 0.92, 1)
-
-[input]
-move_forward={
-"deadzone": 0.2,
-"events": [Object(InputEventKey,"physical_keycode":87), Object(InputEventKey,"physical_keycode":4194320)]
-}
-move_back={
-"deadzone": 0.2,
-"events": [Object(InputEventKey,"physical_keycode":83), Object(InputEventKey,"physical_keycode":4194322)]
-}
-turn_left={
-"deadzone": 0.2,
-"events": [Object(InputEventKey,"physical_keycode":65), Object(InputEventKey,"physical_keycode":4194319)]
-}
-turn_right={
-"deadzone": 0.2,
-"events": [Object(InputEventKey,"physical_keycode":68), Object(InputEventKey,"physical_keycode":4194321)]
-}
+renderer/rendering_method="mobile"
+textures/vram_compression/import_etc2_astc=true
