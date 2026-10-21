@@ -29,6 +29,7 @@ jobs:
           wget -q https://dl.google.com/android/repository/commandlinetools-linux-11076708_latest.zip -O cmdline.zip
           unzip -q cmdline.zip -d $ANDROID_HOME
           yes | $ANDROID_HOME/cmdline-tools/bin/sdkmanager --sdk_root=$ANDROID_HOME --licenses
+          # Install the exact build tools version required by Godot 4.3
           yes | $ANDROID_HOME/cmdline-tools/bin/sdkmanager --sdk_root=$ANDROID_HOME "platform-tools" "build-tools;33.0.2" "platforms;android-33"
 
       - name: Generate Debug Keystore
@@ -43,21 +44,16 @@ jobs:
 
       - name: Configure Godot Editor Settings
         run: |
-          GODOT_CFG=~/.config/godot/editor_settings-4.tres
-          mkdir -p ~/.config/godot
-          # Create the file if it doesn't exist
-          touch $GODOT_CFG
-          # Use sed to insert or update the paths
-          sed -i "s|export/android/java_sdk_path=.*|export/android/java_sdk_path=\"${JAVA_HOME}\"|" $GODOT_CFG
-          sed -i "s|export/android/android_sdk_path=.*|export/android/android_sdk_path=\"${ANDROID_HOME}\"|" $GODOT_CFG
-          # If the lines don't exist, append them
-          grep -q "java_sdk_path" $GODOT_CFG || echo "export/android/java_sdk_path = \"${JAVA_HOME}\"" >> $GODOT_CFG
-          grep -q "android_sdk_path" $GODOT_CFG || echo "export/android/android_sdk_path = \"${ANDROID_HOME}\"" >> $GODOT_CFG
+          # Use sed to update the settings file, as the image does not read it automatically
+          GODOT_CFG=$(ls ~/.config/godot/editor_settings-*.tres)
+          sed -i -e "s:\(^.*java_sdk_path\)\s*=.*$:\1 = \"$JAVA_HOME\":" $GODOT_CFG
+          sed -i -e "s:\(^.*android_sdk_path\)\s*=.*$:\1 = \"$ANDROID_HOME\":" $GODOT_CFG
 
       - name: Export APK
         run: |
           mkdir -v -p build/android
-          godot --headless --export-debug "Android" build/android/AgriWorld.apk
+          # Use --export-release to reduce APK size (not debug)
+          godot --headless --export-release "Android" build/android/AgriWorld.apk
 
       - name: Upload Artifact
         uses: actions/upload-artifact@v4
